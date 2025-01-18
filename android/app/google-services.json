@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "952287628874",
+    "project_id": "pict-hacka",
+    "storage_bucket": "pict-hacka.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:952287628874:android:228b04ca43028071bb20b3",
+        "android_client_info": {
+          "package_name": "com.safe.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAnaN6IdgpgM5KsrUoHdE-fVq2X1TG3l1s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
