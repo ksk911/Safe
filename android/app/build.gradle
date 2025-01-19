@@ -25,10 +25,13 @@ android {
     defaultConfig {
         // Updated applicationId to match your Firebase package name
         applicationId = "com.safe.app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        
+        // Explicitly set minSdkVersion to 23 to resolve the firebase_auth dependency issue
+        minSdk = 23 
+        
+        // Target SDK remains managed by Flutter
         targetSdk = flutter.targetSdkVersion
+        
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
