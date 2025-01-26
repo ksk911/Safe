@@ -2,19 +2,20 @@ import 'dart:ui';
 import "package:firebase_auth/firebase_auth.dart";
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:learningdart/views/login_view.dart';
+import 'package:learningdart/views/login_viewchild.dart';
+import 'package:learningdart/views/login_as_par/child.dart';
 import 'firebase_options.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(
-    MaterialApp(
-        title: 'Flutter Demo',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-        ),
-        home: const LoginView()),
-  );
+  runApp(MaterialApp(
+          title: 'Flutter Demo',
+          theme: ThemeData(
+            primarySwatch: Colors.blue,
+          ),
+          home: CustomButtonDemo())
+      //home: const LoginView()),
+      );
 }
 
 class MyApp extends StatelessWidget {

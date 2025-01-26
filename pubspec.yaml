@@ -15,6 +15,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   firebase_core: ^3.10.0 # Core Firebase integration
   firebase_auth: ^5.4.0 # Firebase Authentication
+  cloud_firestore: ^5.6.2
 
 dev_dependencies:
   flutter_test:
@@ -24,3 +25,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - lib/assets/images/icons8-parents-48.png
+    - lib/assets/images/icons8-boy-48.png
