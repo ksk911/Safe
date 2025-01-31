@@ -1,7 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import "package:learningdart/views/login_viewchild.dart";
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:learningdart/views/parent_filldetails_after_login.dart';
+import 'package:learningdart/views/login_viewchild.dart';
+import 'package:learningdart/views/reg_child.dart';
+import 'package:learningdart/views/parent_reg.dart';
 
 Widget buildCustomButton(String imagePath, String title, Function()? onTap) {
   return InkWell(
@@ -23,7 +27,7 @@ Widget buildCustomButton(String imagePath, String title, Function()? onTap) {
           title,
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 16),
-        )
+        ),
       ],
     ),
   );
@@ -52,6 +56,51 @@ class _CustomButtonDemoState extends State<CustomButtonDemo> {
     _email.dispose();
     _password.dispose();
     super.dispose();
+  }
+
+  Future<void> _loginParent() async {
+    final email = _email.text.trim();
+    final password = _password.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+
+    try {
+      UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
+
+      final String uid = userCredential.user!.uid;
+
+      // ✅ Step 2: Cross-check the Parent Table in Firestore
+      DocumentSnapshot parentDoc =
+          await FirebaseFirestore.instance.collection('Parent').doc(uid).get();
+
+      if (parentDoc.exists) {
+        // ✅ Parent exists, navigate to the next page
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ParentDetails()),
+        );
+        print('Parent logged in successfully');
+      } else {
+        // ❌ User is NOT a parent, log them out and show error
+        await FirebaseAuth.instance.signOut();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'Access Denied: You are not a parent. Please Register First')),
+        );
+      }
+    } catch (e) {
+      print('Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed. Check your credentials.')),
+      );
+    }
   }
 
   @override
@@ -94,17 +143,7 @@ class _CustomButtonDemoState extends State<CustomButtonDemo> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   ElevatedButton(
-                    onPressed: () async {
-                      final email = _email.text;
-                      final password = _password.text;
-                      try {
-                        await FirebaseAuth.instance.signInWithEmailAndPassword(
-                            email: email, password: password);
-                        print('Parent logged in successfully');
-                      } catch (e) {
-                        print('Error: $e');
-                      }
-                    },
+                    onPressed: _loginParent,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,
                       foregroundColor: Colors.white,
@@ -122,7 +161,7 @@ class _CustomButtonDemoState extends State<CustomButtonDemo> {
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
                     ),
-                    child: Text('Login as Child'),
+                    child: Text('Login as Child ??'),
                   ),
                 ],
               ),
@@ -133,12 +172,24 @@ class _CustomButtonDemoState extends State<CustomButtonDemo> {
                   buildCustomButton(
                     'lib/assets/images/icons8-parents-48.png',
                     'Parent Registration',
-                    () => print("Parent Registration"),
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const RegisterParent()),
+                      );
+                    },
                   ),
                   buildCustomButton(
                     'lib/assets/images/icons8-boy-48.png',
                     'Child Registration',
-                    () => print("Child Registration"),
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const RegisterChild()),
+                      );
+                    },
                   ),
                 ],
               ),

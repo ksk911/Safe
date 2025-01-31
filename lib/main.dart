@@ -5,9 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:learningdart/views/login_viewchild.dart';
 import 'package:learningdart/views/login_as_par/child.dart';
 import 'firebase_options.dart';
+import 'package:learningdart/views/parent_filldetails_after_login.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(MaterialApp(
           title: 'Flutter Demo',
           theme: ThemeData(
