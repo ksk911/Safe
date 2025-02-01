@@ -6,6 +6,7 @@ import 'package:learningdart/views/login_viewchild.dart';
 import 'package:learningdart/views/login_as_par/child.dart';
 import 'firebase_options.dart';
 import 'package:learningdart/views/parent_filldetails_after_login.dart';
+import 'package:learningdart/views/databasestructure.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

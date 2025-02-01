@@ -54,8 +54,7 @@ class _LoginViewState extends State<LoginView> {
       if (childDoc.exists) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-              builder: (context) => const child_view_after_login_adddevice()),
+          MaterialPageRoute(builder: (context) => const ChildLocationView()),
         );
       } else {
         await FirebaseAuth.instance.signOut();
