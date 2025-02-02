@@ -7,11 +7,19 @@ import 'package:learningdart/views/login_as_par/child.dart';
 import 'firebase_options.dart';
 import 'package:learningdart/views/parent_filldetails_after_login.dart';
 import 'package:learningdart/views/databasestructure.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // ✅ Enable Firestore Debug Logs
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true, // Enable offline persistence
+    host: "firestore.googleapis.com",
+    sslEnabled: true, // Use SSL connection
   );
 
   runApp(MaterialApp(
@@ -139,87 +147,3 @@ class _RegisterViewState extends State<RegisterView> {
     );
   }
 }
-
-/* class LoginView extends StatefulWidget {
-  const LoginView({super.key});
-
-  @override
-  State<LoginView> createState() => _LoginViewState();
-}
-
-class _LoginViewState extends State<LoginView> {
-  late final TextEditingController _email;
-  late final TextEditingController _password;
-
-  @override
-  void initState() {
-    _email = TextEditingController();
-    _password = TextEditingController();
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    _email.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Align(
-            alignment: Alignment.center,
-            child: Text(
-              'Register',
-              //textAlign: TextAlign.center,
-            )),
-        backgroundColor: const Color.fromARGB(255, 251, 64, 145),
-      ),
-      body: FutureBuilder(
-        future: Firebase.initializeApp(
-            options: DefaultFirebaseOptions.currentPlatform),
-        builder: (context, snapshot) {
-          switch (snapshot.connectionState) {
-            case ConnectionState.done:
-              return Column(
-                children: [
-                  TextField(
-                    controller: _email,
-                    /* enableSuggestions: false, */
-                    autocorrect: false,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(hintText: 'TYPE YOUR EMAIL'),
-                  ),
-                  TextField(
-                    controller: _password,
-                    obscureText: true,
-                    enableSuggestions: false,
-                    autocorrect: false,
-                    decoration:
-                        InputDecoration(hintText: 'Enter your password'),
-                  ),
-                  TextButton(
-                      onPressed: () async {
-                        //print('helo world');
-
-                        final email = _email.text;
-                        final password = _password.text;
-                        print(password);
-                        final usercredential = await FirebaseAuth.instance
-                            .createUserWithEmailAndPassword(
-                                email: email, password: password);
-                        print(usercredential);
-                      },
-                      child: const Text('Resgister Now!!')),
-                ],
-              );
-            default:
-              return const Text('Loading ...');
-          }
-        },
-      ),
-    );
-  }
-} */

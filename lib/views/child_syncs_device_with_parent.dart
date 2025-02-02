@@ -4,7 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:learningdart/views/databasestructure.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ChildLocationView extends StatefulWidget {
   const ChildLocationView({super.key});
@@ -19,10 +19,11 @@ class _ChildLocationViewState extends State<ChildLocationView> {
 
   Position? _currentPosition;
   String? _currentAddress;
-  bool _isLocationSharing = false;
-  LatLng? _mapLocation;
   bool _isParentVerified = false;
   String _parentDetailsMessage = "";
+  String _syncedParentName = "";
+  String _syncedParentId = "";
+  LatLng? _mapLocation;
 
   @override
   void dispose() {
@@ -31,59 +32,41 @@ class _ChildLocationViewState extends State<ChildLocationView> {
     super.dispose();
   }
 
+  /// 🔹 Get Current Location
   Future<void> _getLocation() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
-
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          print("Location permission denied.");
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Location permission is required.")),
-          );
+          print("❌ Location permission denied.");
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        print("Location permission permanently denied. Go to settings.");
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Location permission is permanently denied. Please enable it in settings.",
-            ),
-          ),
-        );
+        print("❌ Location permission permanently denied.");
         return;
       }
 
-      if (permission == LocationPermission.whileInUse ||
-          permission == LocationPermission.always) {
-        print("Location permission granted. Fetching location...");
-
-        Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-
-        setState(() {
-          _currentPosition = position;
-          _mapLocation = LatLng(position.latitude, position.longitude);
-        });
-
-        print(
-            "Latitude: ${position.latitude}, Longitude: ${position.longitude}");
-
-        _getAddressFromLatLng(position.latitude, position.longitude);
-      }
-    } catch (e) {
-      print("Error getting location: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error getting location: $e")),
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
       );
+
+      setState(() {
+        _currentPosition = position;
+        _mapLocation = LatLng(position.latitude, position.longitude);
+      });
+
+      print(
+          "📍 Latitude: ${position.latitude}, Longitude: ${position.longitude}");
+      _getAddressFromLatLng(position.latitude, position.longitude);
+    } catch (e) {
+      print("❌ Error getting location: $e");
     }
   }
 
+  /// 🔹 Get Address from LatLng
   Future<void> _getAddressFromLatLng(double lat, double lon) async {
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(lat, lon);
@@ -93,40 +76,26 @@ class _ChildLocationViewState extends State<ChildLocationView> {
         _currentAddress =
             "${place.street}, ${place.locality}, ${place.administrativeArea}, ${place.country}";
       });
+
+      print("🏡 Address: $_currentAddress");
     } catch (e) {
-      print("Error getting address: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error getting address: $e")),
-      );
+      print("❌ Error getting address: $e");
     }
   }
 
-  void _toggleLocationSharing() {
-    setState(() {
-      _isLocationSharing = !_isLocationSharing;
-    });
-
-    if (_isLocationSharing) {
-      _getLocation();
-    }
-    print("Getting location...");
-  }
-
+  /// 🔹 Sync Parent Details and Store in Child Document
   Future<void> _syncParent() async {
     String enteredParentName = _parentNameController.text.trim();
     String enteredParentId = _parentIdController.text.trim();
 
     if (enteredParentName.isEmpty || enteredParentId.isEmpty) {
-      setState(() {
-        _parentDetailsMessage = "Please enter both Parent Name and Parent ID.";
-        _isParentVerified = false;
-      });
+      print("⚠️ Enter both Parent Name and Parent ID.");
       return;
     }
 
     try {
       DocumentSnapshot parentDoc = await FirebaseFirestore.instance
-          .collection('Parent')
+          .collection("Parent")
           .doc(enteredParentId)
           .get();
 
@@ -135,28 +104,31 @@ class _ChildLocationViewState extends State<ChildLocationView> {
         String storedId = parentDoc['Parent_ID'];
 
         if (storedName == enteredParentName && storedId == enteredParentId) {
+          print("✅ Parent Synced Successfully!");
+
+          // ✅ Store Parent ID inside Child Document
+          String childId = FirebaseAuth.instance.currentUser!.uid;
+          await FirebaseFirestore.instance
+              .collection("Child")
+              .doc(childId)
+              .update({
+            "Parent_ID": enteredParentId,
+          });
+
           setState(() {
             _isParentVerified = true;
+            _syncedParentName = enteredParentName;
+            _syncedParentId = enteredParentId;
             _parentDetailsMessage = "Parent synced successfully!";
           });
         } else {
-          setState(() {
-            _isParentVerified = false;
-            _parentDetailsMessage = "Parent details do not match.";
-          });
+          print("❌ Parent details do not match.");
         }
       } else {
-        setState(() {
-          _isParentVerified = false;
-          _parentDetailsMessage = "Parent not found.";
-        });
+        print("❌ Parent not found.");
       }
     } catch (e) {
-      print("Error syncing parent: $e");
-      setState(() {
-        _isParentVerified = false;
-        _parentDetailsMessage = "Error syncing parent.";
-      });
+      print("❌ Error syncing parent: $e");
     }
   }
 
@@ -183,61 +155,43 @@ class _ChildLocationViewState extends State<ChildLocationView> {
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 labelText: 'Parent ID',
-                hintText: 'Enter Parent ID (e.g., Ayfp98ddlnv)',
+                hintText: 'Enter Parent ID',
               ),
             ),
             const SizedBox(height: 20),
 
-            // Button to Sync Parent
+            /// 🔹 Button: Sync Parent
             ElevatedButton(
               onPressed: _syncParent,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-              ),
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
               child: const Text("Sync Parent ID"),
             ),
 
-            // Display parent verification result
-            if (_parentDetailsMessage.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10.0),
+            if (_isParentVerified) ...[
+              const SizedBox(height: 20),
+
+              /// 🔹 Button: Display Parent Info (Only if Synced)
+              ElevatedButton(
+                onPressed: () {},
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                 child: Text(
-                  _parentDetailsMessage,
-                  style: TextStyle(
-                    color: _isParentVerified ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                    "Parent Synced: $_syncedParentName ($_syncedParentId)"),
               ),
+            ],
 
             const SizedBox(height: 20),
 
-            // Button to Toggle Location Sharing
+            /// 🔹 Button: Get Location
             ElevatedButton(
-              onPressed: _toggleLocationSharing,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _isLocationSharing ? Colors.green : Colors.red,
-              ),
-              child: Text(
-                _isLocationSharing ? "Location Active ✅" : "Enable Location 📍",
-              ),
+              onPressed: _getLocation,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text("Get Location"),
             ),
 
             const SizedBox(height: 20),
 
-            //firestore structure button retrieval
-
-            // Display Current Address
-            if (_currentAddress != null)
-              Text(
-                "Current Address: $_currentAddress",
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-
-            const SizedBox(height: 20),
-
-            // Display Map
+            /// 🔹 Display Map
             Expanded(
               child: _mapLocation != null
                   ? FlutterMap(
@@ -249,7 +203,6 @@ class _ChildLocationViewState extends State<ChildLocationView> {
                         TileLayer(
                           urlTemplate:
                               "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                          subdomains: ['a', 'b', 'c'],
                         ),
                         MarkerLayer(
                           markers: [
@@ -257,12 +210,9 @@ class _ChildLocationViewState extends State<ChildLocationView> {
                               point: _mapLocation!,
                               width: 80,
                               height: 80,
-                              child: const Icon(
-                                Icons.location_on,
-                                size: 40,
-                                color: Colors.red,
-                              ),
-                            )
+                              child: const Icon(Icons.location_on,
+                                  size: 40, color: Colors.red),
+                            ),
                           ],
                         ),
                       ],

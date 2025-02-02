@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:learningdart/views/login_viewchild.dart';
 
 class RegisterChild extends StatefulWidget {
   const RegisterChild({Key? key}) : super(key: key);
@@ -120,9 +121,15 @@ class _RegisterChildState extends State<RegisterChild> {
             _isLoading
                 ? const CircularProgressIndicator()
                 : ElevatedButton(
-                    onPressed: registerChild,
-                    child: const Text('Register'),
-                  ),
+                    onPressed: () async {
+                      await registerChild();
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const LoginView()),
+                      );
+                    },
+                    child: const Text('Register')),
           ],
         ),
       ),
