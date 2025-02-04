@@ -6,6 +6,7 @@ import 'package:learningdart/views/parent_filldetails_after_login.dart';
 import 'package:learningdart/views/login_viewchild.dart';
 import 'package:learningdart/views/reg_child.dart';
 import 'package:learningdart/views/parent_reg.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // 🔹 Added Firebase Messaging import
 
 Widget buildCustomButton(String imagePath, String title, Function()? onTap) {
   return InkWell(
@@ -58,6 +59,15 @@ class _CustomButtonDemoState extends State<CustomButtonDemo> {
     super.dispose();
   }
 
+  // 🔹 Function to update FCM token on login
+  Future<void> updateParentTokenOnLogin(String parentId) async {
+    String? fcmToken = await FirebaseMessaging.instance.getToken();
+
+    await FirebaseFirestore.instance.collection('Parent').doc(parentId).update({
+      'Notification_Token': fcmToken, // ✅ Update token on login
+    });
+  }
+
   Future<void> _loginParent() async {
     final email = _email.text.trim();
     final password = _password.text.trim();
@@ -80,7 +90,8 @@ class _CustomButtonDemoState extends State<CustomButtonDemo> {
           await FirebaseFirestore.instance.collection('Parent').doc(uid).get();
 
       if (parentDoc.exists) {
-        // ✅ Parent exists, navigate to the next page
+        // ✅ Parent exists, update FCM token and navigate to the next page
+        await updateParentTokenOnLogin(uid); // 🔹 Update FCM token
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const ParentDetails()),

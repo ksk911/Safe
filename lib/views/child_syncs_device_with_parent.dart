@@ -1,4 +1,263 @@
+//this is where the code for pushing the notification button is :
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:learningdart/views/child_sends_notification_parent.dart'; // Import notification service
+import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geocoding/geocoding.dart'; // ✅ Missing import added
+
+class ChildLocationView extends StatefulWidget {
+  const ChildLocationView({super.key});
+
+  @override
+  State<ChildLocationView> createState() => _ChildLocationViewState();
+}
+
+class _ChildLocationViewState extends State<ChildLocationView> {
+  final TextEditingController _parentNameController = TextEditingController();
+  final TextEditingController _parentIdController = TextEditingController();
+  final ChildNotificationService _notificationService =
+      ChildNotificationService();
+
+  Position? _currentPosition;
+  LatLng? _mapLocation;
+  String? _currentAddress;
+
+  @override
+  void dispose() {
+    _parentNameController.dispose();
+    _parentIdController.dispose();
+    super.dispose();
+  }
+
+  /// 🔹 Get Current Location & Address
+  Future<void> _getLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          print("❌ Location permission denied.");
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        print("❌ Location permission permanently denied.");
+        return;
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      setState(() {
+        _currentPosition = position;
+        _mapLocation = LatLng(position.latitude, position.longitude);
+      });
+
+      print(
+          "📍 Latitude: ${position.latitude}, Longitude: ${position.longitude}");
+      _getAddressFromLatLng(position.latitude, position.longitude);
+    } catch (e) {
+      print("❌ Error getting location: $e");
+    }
+  }
+
+  /// 🔹 Get Address from LatLng
+  Future<void> _getAddressFromLatLng(double lat, double lon) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lon);
+      Placemark place = placemarks.isNotEmpty ? placemarks[0] : Placemark();
+
+      setState(() {
+        _currentAddress =
+            "${place.street}, ${place.locality}, ${place.administrativeArea}, ${place.country}";
+      });
+
+      print("🏡 Address: $_currentAddress");
+    } catch (e) {
+      print("❌ Error getting address: $e");
+    }
+  }
+
+  /// 🔹 Sync Parent & Send Notification
+  Future<void> _syncParent() async {
+    String enteredParentName = _parentNameController.text.trim();
+    String enteredParentId = _parentIdController.text.trim();
+
+    if (enteredParentName.isEmpty || enteredParentId.isEmpty) {
+      print("⚠️ Enter both Parent Name and Parent ID.");
+      return;
+    }
+
+    try {
+      DocumentSnapshot parentDoc = await FirebaseFirestore.instance
+          .collection("Parent")
+          .doc(enteredParentId)
+          .get();
+
+      if (parentDoc.exists) {
+        String storedName = parentDoc["Name"];
+        String storedId = parentDoc["Parent_ID"];
+
+        if (storedName == enteredParentName && storedId == enteredParentId) {
+          print("✅ Parent Synced Successfully!");
+
+          String childId = FirebaseAuth.instance.currentUser!.uid;
+          await FirebaseFirestore.instance
+              .collection("Child")
+              .doc(childId)
+              .update({
+            "Parent_ID": enteredParentId,
+          });
+
+          // 🔹 Send Notification to Parent
+          await _notificationService.sendSyncRequestToParent(
+              enteredParentId, childId);
+        } else {
+          print("❌ Parent details do not match.");
+        }
+      } else {
+        print("❌ Parent not found.");
+      }
+    } catch (e) {
+      print("❌ Error syncing parent: $e");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Child Location")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            TextField(
+              controller: _parentNameController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Parent Name',
+                hintText: 'Enter Name (e.g., Ramesh Singh)',
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _parentIdController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Parent ID',
+                hintText: 'Enter Parent ID',
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            /// 🔹 Sync Parent Button
+            ElevatedButton(
+              onPressed: _syncParent,
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+              child: const Text("Sync Parent ID"),
+            ),
+
+            const SizedBox(height: 20),
+
+            /// 🔹 Get Location Button
+            ElevatedButton(
+              onPressed: _getLocation,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text("Get Location"),
+            ),
+
+            const SizedBox(height: 20),
+
+            /// 🔹 Map & Address Box
+            if (_mapLocation != null)
+              Container(
+                padding: const EdgeInsets.all(12.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 8.0,
+                      spreadRadius: 2.0,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 200, // Adjust map height
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: FlutterMap(
+                          options: MapOptions(
+                            initialCenter: _mapLocation!,
+                            initialZoom: 15.0,
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate:
+                                  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                            ),
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: _mapLocation!,
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(Icons.location_on,
+                                      size: 30, color: Colors.red),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    /// 🔹 Address Display
+                    _currentAddress != null
+                        ? Text(
+                            "📍 $_currentAddress",
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black87,
+                            ),
+                          )
+                        : const Text(
+                            "Fetching Address...",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey,
+                            ),
+                          ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+
+
+/* import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -225,3 +484,5 @@ class _ChildLocationViewState extends State<ChildLocationView> {
     );
   }
 }
+ */ 
+
