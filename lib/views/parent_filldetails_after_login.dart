@@ -18,6 +18,7 @@ class _ParentDetailsState extends State<ParentDetails> {
   String? selectedChildId;
   LatLng? parentLocation;
   LatLng? childLocation;
+  final MapController _mapController = MapController(); // Add MapController
 
   @override
   void initState() {
@@ -120,12 +121,32 @@ class _ParentDetailsState extends State<ParentDetails> {
           content: Text("✅ Sync request approved successfully!")));
     } catch (e) {
       print("❌ Error approving sync request: $e");
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("❌ Error approving sync request: ${e.toString()}")));
     }
   }
 
   /// 🔹 Reject Sync Request
   Future<void> rejectSyncRequest(String childId) async {
     try {
+      // Ensure the sync request belongs to the current parent
+      DocumentSnapshot syncRequestDoc = await FirebaseFirestore.instance
+          .collection("SyncRequests")
+          .doc(childId)
+          .get();
+
+      if (!syncRequestDoc.exists) {
+        print("❌ Sync request not found!");
+        return;
+      }
+
+      String? parentIdInRequest = syncRequestDoc["Parent_ID"];
+      if (parentIdInRequest != parentId) {
+        print("❌ You do not have permission to reject this sync request.");
+        return;
+      }
+
+      // Delete the sync request
       await FirebaseFirestore.instance
           .collection("SyncRequests")
           .doc(childId)
@@ -135,6 +156,34 @@ class _ParentDetailsState extends State<ParentDetails> {
           content: Text("✅ Sync request rejected successfully!")));
     } catch (e) {
       print("❌ Error rejecting sync request: $e");
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("❌ Error rejecting sync request: ${e.toString()}")));
+    }
+  }
+
+  /// 🔹 Adjust Map View to Include Parent and Child Locations
+  void _adjustMapView() {
+    if (parentLocation != null && childLocation != null) {
+      // Calculate the midpoint between parent and child locations
+      double midLat = (parentLocation!.latitude + childLocation!.latitude) / 2;
+      double midLng =
+          (parentLocation!.longitude + childLocation!.longitude) / 2;
+      LatLng midpoint = LatLng(midLat, midLng);
+
+      // Calculate the distance between parent and child using Geolocator
+      double distance = Geolocator.distanceBetween(
+        parentLocation!.latitude,
+        parentLocation!.longitude,
+        childLocation!.latitude,
+        childLocation!.longitude,
+      );
+
+      // Adjust zoom level dynamically based on the distance
+      double zoomLevel =
+          12 - (distance / 10000); // Adjust this formula as needed
+
+      // Move the map to the midpoint and set the zoom level
+      _mapController.move(midpoint, zoomLevel);
     }
   }
 
@@ -167,6 +216,7 @@ class _ParentDetailsState extends State<ParentDetails> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(15),
                       child: FlutterMap(
+                        mapController: _mapController, // Add MapController
                         options: MapOptions(
                           initialCenter:
                               parentLocation ?? LatLng(20.5937, 78.9629),
@@ -177,11 +227,9 @@ class _ParentDetailsState extends State<ParentDetails> {
                             urlTemplate:
                                 "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                           ),
-
-                          /// 🔹 Parent's Location Marker
-                          if (parentLocation != null)
-                            MarkerLayer(
-                              markers: [
+                          MarkerLayer(
+                            markers: [
+                              if (parentLocation != null)
                                 Marker(
                                   point: parentLocation!,
                                   width: 50,
@@ -195,33 +243,22 @@ class _ParentDetailsState extends State<ParentDetails> {
                                     ],
                                   ),
                                 ),
-                              ],
-                            ),
-
-                          /// 🔹 Selected Child’s Location Marker
-                          if (selectedChildId != null)
-                            MarkerLayer(
-                              markers: childrenLocations
-                                  .where((child) =>
-                                      child["Child_ID"] == selectedChildId &&
-                                      child["Location"] != null)
-                                  .map(
-                                    (child) => Marker(
-                                      point: child["Location"],
-                                      width: 50,
-                                      height: 50,
-                                      child: const Column(
-                                        children: [
-                                          Icon(Icons.location_on,
-                                              color: Colors.red, size: 40),
-                                          Text("Child",
-                                              style: TextStyle(fontSize: 12)),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
+                              if (childLocation != null)
+                                Marker(
+                                  point: childLocation!,
+                                  width: 50,
+                                  height: 50,
+                                  child: const Column(
+                                    children: [
+                                      Icon(Icons.location_on,
+                                          color: Colors.red, size: 40),
+                                      Text("Child",
+                                          style: TextStyle(fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -242,6 +279,9 @@ class _ParentDetailsState extends State<ParentDetails> {
                     onChanged: (String? value) {
                       setState(() {
                         selectedChildId = value;
+                        childLocation = childrenLocations.firstWhere(
+                            (child) => child["Child_ID"] == value)["Location"];
+                        _adjustMapView(); // Adjust map view when child is selected
                       });
                     },
                   ),
